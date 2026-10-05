@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Calculadora IMC, TMB e GET</title>
+<style>
+:root{--bg:#f3f6f4;--card:#fff;--ink:#12302a;--mute:#5b706a;--line:#d5e0db;--accent:#0f766e;--accent-ink:#fff;--soft:#e2f1ee;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e1917;--card:#15251f;--ink:#e6f1ee;--mute:#92a9a2;--line:#274038;--accent:#2dd4bf;--accent-ink:#06211c;--soft:#1b3330}}
+:root[data-theme="dark"]{--bg:#0e1917;--card:#15251f;--ink:#e6f1ee;--mute:#92a9a2;--line:#274038;--accent:#2dd4bf;--accent-ink:#06211c;--soft:#1b3330}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 "Source Sans 3","Segoe UI",system-ui,sans-serif}
+main{max-width:560px;margin:0 auto;padding:20px 16px 32px}
+h1{font:600 1.5rem/1.2 Georgia,"Times New Roman",serif;margin:0 0 4px}
+.sub{color:var(--mute);margin:0 0 18px;font-size:.95rem}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:14px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+label{display:block;font-size:.85rem;color:var(--mute);margin-bottom:4px}
+input,select{width:100%;font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px}
+input:focus,select:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.full{grid-column:1/-1}
+button{width:100%;margin-top:14px;font:600 1rem inherit;font-family:inherit;background:var(--accent);color:var(--accent-ink);border:0;border-radius:8px;padding:12px;cursor:pointer}
+.err{color:#b42318;font-size:.9rem;margin-top:10px;min-height:1.2em}
+@media (prefers-color-scheme:dark){.err{color:#fda29b}}
+.res{display:none}
+.res.on{display:block}
+.row{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}
+.row:last-child{border:0}
+.row b{font:600 1.6rem Georgia,serif}
+.row small{display:block;color:var(--mute);font-size:.82rem}
+.tag{display:inline-block;background:var(--soft);color:var(--ink);border-radius:6px;padding:2px 8px;font-size:.85rem;font-weight:600}
+.note{color:var(--mute);font-size:.8rem;margin:6px 0 0}
+</style>
+</head>
+<body>
+<main>
+<h1>IMC, TMB e GET</h1>
+<p class="sub">Preencha os dados do paciente e calcule.</p>
+
+<div class="card">
+<div class="grid">
+<div><label for="sexo">Sexo</label><select id="sexo"><option value="m">Masculino</option><option value="f">Feminino</option></select></div>
+<div><label for="idade">Idade (anos)</label><input id="idade" type="number" inputmode="numeric" min="1" max="120"></div>
+<div><label for="peso">Peso (kg)</label><input id="peso" type="number" inputmode="decimal" step="0.1" min="1"></div>
+<div><label for="altura">Altura (cm)</label><input id="altura" type="number" inputmode="decimal" step="0.1" min="30"></div>
+<div class="full"><label for="formula">Equação da TMB</label>
+<select id="formula">
+<option value="mifflin">Mifflin-St Jeor</option>
+<option value="hb">Harris-Benedict (revisada, 1984)</option>
+<option value="cunn">Cunningham (massa livre de gordura)</option>
+</select></div>
+<div class="full" id="gcBox" hidden><label for="gc">Percentual de gordura (%)</label><input id="gc" type="number" inputmode="decimal" step="0.1" min="1" max="70"></div>
+<div class="full"><label for="fa">Nível de atividade física</label>
+<select id="fa">
+<option value="1.2">Sedentário (1,2)</option>
+<option value="1.375">Levemente ativo (1,375)</option>
+<option value="1.55" selected>Moderadamente ativo (1,55)</option>
+<option value="1.725">Muito ativo (1,725)</option>
+<option value="1.9">Extremamente ativo (1,9)</option>
+</select></div>
+</div>
+<button id="calc" type="button">Calcular</button>
+<div class="err" id="err" role="alert"></div>
+</div>
+
+<div class="card res" id="res">
+<div class="row"><div>IMC<small id="imcTxt"></small></div><div><b id="imc"></b> <span class="tag" id="cls"></span></div></div>
+<div class="row"><div>TMB<small id="tmbTxt"></small></div><div><b id="tmb"></b> kcal</div></div>
+<div class="row"><div>GET<small id="getTxt"></small></div><div><b id="get"></b> kcal</div></div>
+<p class="note" id="faixa"></p>
+<p class="note">Classificação do IMC pela OMS para adultos. Para idosos (60+), use os pontos de corte de Lipschitz. Ferramenta de apoio: a conduta depende da avaliação clínica.</p>
+</div>
+</main>
+<script>
+var $=function(i){return document.getElementById(i)};
+function fmt(n,d){return n.toLocaleString("pt-BR",{minimumFractionDigits:d||0,maximumFractionDigits:d||0})}
+$("formula").addEventListener("change",function(){$("gcBox").hidden=this.value!=="cunn"});
+function classe(i){
+ if(i<16)return"Magreza grau III";if(i<17)return"Magreza grau II";if(i<18.5)return"Magreza grau I";
+ if(i<25)return"Eutrofia";if(i<30)return"Sobrepeso";if(i<35)return"Obesidade grau I";
+ if(i<40)return"Obesidade grau II";return"Obesidade grau III"}
+$("calc").addEventListener("click",function(){
+ var s=$("sexo").value,a=parseFloat($("idade").value),w=parseFloat($("peso").value),h=parseFloat($("altura").value),
+ f=$("formula").value,fa=parseFloat($("fa").value),gc=parseFloat($("gc").value),err=$("err");
+ err.textContent="";
+ if(!(a>0&&w>0&&h>0)){err.textContent="Informe idade, peso e altura.";return}
+ if(f==="cunn"&&!(gc>0&&gc<70)){err.textContent="Cunningham exige o percentual de gordura.";return}
+ var m=h/100,imc=w/(m*m),tmb,nome;
+ if(f==="mifflin"){tmb=10*w+6.25*h-5*a+(s==="m"?5:-161);nome="Mifflin-St Jeor"}
+ else if(f==="hb"){tmb=s==="m"?88.362+13.397*w+4.799*h-5.677*a:447.593+9.247*w+3.098*h-4.330*a;nome="Harris-Benedict revisada"}
+ else{tmb=500+22*(w*(1-gc/100));nome="Cunningham"}
+ var get=tmb*fa;
+ $("imc").textContent=fmt(imc,1);$("cls").textContent=classe(imc);$("imcTxt").textContent="kg/m²";
+ $("tmb").textContent=fmt(tmb);$("tmbTxt").textContent=nome;
+ $("get").textContent=fmt(get);$("getTxt").textContent="TMB × "+fmt(fa,fa%1?3:1).replace(/0+$/,"");
+ $("faixa").textContent="Peso para IMC 18,5 a 24,9: "+fmt(18.5*m*m,1)+" a "+fmt(24.9*m*m,1)+" kg.";
+ $("res").classList.add("on");
+});
+</script>
+</body>
+</html>
